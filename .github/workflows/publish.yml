@@ -1,39 +1,27 @@
-name: Publish catalog index
+name: Propose catalog transport repair
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
-  contents: write
-  actions: read
-  checks: read
-  pull-requests: read
-  id-token: write
-concurrency:
-  group: catalog-publication
-  cancel-in-progress: false
+  contents: read
+  pull-requests: write
 jobs:
-  publish:
-    if: vars.CATALOG_PUBLISH_ENABLED == 'true'
+  propose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-      # No candidate imports, installs or tests run in this credentialed job.
-      - name: Verify admission and publish immutable index
+      - name: Open the repair branch for human review
         env:
           GH_TOKEN: ${{ github.token }}
-          CATALOG_READ_TOKEN: ${{ secrets.CATALOG_READ_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: node bin/twin-catalog.mjs publish --out dist > publication.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: catalog-publication-${{ github.run_id }}
-          path: publication.json
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REPOSITORY" in
+            volter-ai/twin-catalog|volter-ai/twin-catalog-sandbox) ;;
+            *) exit 1 ;;
+          esac
+          cat > /tmp/transport-pr.md <<'BODY'
+          The sandbox evaluator retained ready evidence but failed while rereading the PR from GitHub (run 37313751170, attempts 1 and 2), leaving readiness in progress.
+
+          Retry one transport failure for GET requests and report the underlying error code. HTTP refusals and writes are never retried. Current-head readiness and human moderation remain required.
+
+          Validation: all 26 scoped process and packaging tests passed through a disposable World with released runtime 3.0.47 and Bun 1.3.11. This includes recovery after one failed read, repeated transport failure, HTTP refusals, and no replay of POST/PATCH/PUT/DELETE. Actual sandbox provenance and offline Chromium assessment also passed before the reporting failure. The transport repair has fixture verification; real admission must be rerun after merge.
+          BODY
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head catalog/retry-read-transport --title "Retry failed GitHub reads when reporting catalog readiness" --body-file /tmp/transport-pr.md
