@@ -179,6 +179,42 @@ test('publishing retries matching source identity and refuses a conflicting vers
   assert.equal(same.existing, true);
   await assert.rejects(publish(out, 'https://registry.npmjs.org', async () => ({ ok: true, json: async () => ({ ...pkg, catalog: {} }) }), noExecution), /conflicts/);
 });
+function confirmationClock() {
+  let elapsed = 0;
+  const waits = [];
+  return { waits, options: { windowMs: 100, intervalMs: 60, now: () => elapsed, sleep: async (ms) => { waits.push(ms); elapsed += ms; } } };
+}
+test('registry confirmation waits for visibility without uploading twice', async () => {
+  const { root } = fixture(), out = join(root, 'output'); build(root, out);
+  const pkg = read(join(out, 'package.json')), clock = confirmationClock();
+  let reads = 0, uploads = 0;
+  const result = await publish(out, 'https://registry.npmjs.org', async () => ++reads < 3
+    ? { ok: false, status: 404 }
+    : { ok: true, json: async () => ({ ...pkg, dist: { integrity: integrityOf(bytes) } }) }, () => { uploads++; return { status: 0 }; }, clock.options);
+  assert.equal(result.published, true); assert.equal(uploads, 1); assert.deepEqual(clock.waits, [60]);
+});
+test('unconfirmed upload exhausts its read window and never uploads again', async () => {
+  const { root } = fixture(), out = join(root, 'output'); build(root, out);
+  const clock = confirmationClock(); let uploads = 0;
+  await assert.rejects(publish(out, 'https://registry.npmjs.org', async () => ({ ok: false, status: 404 }), () => { uploads++; return { status: 0 }; }, clock.options), /upload is unverified/);
+  assert.equal(uploads, 1); assert.deepEqual(clock.waits, [60, 40]);
+});
+test('registry confirmation refuses other HTTP errors without waiting', async () => {
+  const { root } = fixture(), out = join(root, 'output'); build(root, out);
+  for (const status of [403, 503]) {
+    const clock = confirmationClock(); let reads = 0, uploads = 0;
+    await assert.rejects(publish(out, 'https://registry.npmjs.org', async () => ({ ok: false, status: ++reads === 1 ? 404 : status }), () => { uploads++; return { status: 0 }; }, clock.options), new RegExp(`confirmation failed: HTTP ${status}`));
+    assert.equal(uploads, 1); assert.deepEqual(clock.waits, []);
+  }
+});
+test('eventually visible registry identity must still match the admitted source', async () => {
+  const { root } = fixture(), out = join(root, 'output'); build(root, out);
+  const pkg = read(join(out, 'package.json')), clock = confirmationClock(); let reads = 0, uploads = 0;
+  await assert.rejects(publish(out, 'https://registry.npmjs.org', async () => ++reads < 3
+    ? { ok: false, status: 404 }
+    : { ok: true, json: async () => ({ ...pkg, catalog: {}, dist: { integrity: integrityOf(bytes) } }) }, () => { uploads++; return { status: 0 }; }, clock.options), /published registry identity differs/);
+  assert.equal(uploads, 1); assert.deepEqual(clock.waits, [60]);
+});
 test('readiness on a stale head is cancelled and cannot leave successful feedback', async () => {
   const { root, git } = fixture(), head = 'c'.repeat(40), base = git('rev-parse', 'HEAD'), s = submitted();
   const filename = `submissions/${submissionId(s)}.json`, calls = [];

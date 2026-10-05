@@ -203,6 +203,14 @@ anything deployed. Credentialed publication never evaluates candidate code. Reje
 they are not added to the resolvable index. Revocation of an admitted version is an explicit moderator-maintained
 record with a reason; it removes the version from future selection without rewriting its artifact or existing pins.
 
+After npm accepts an upload, publication confirms the exact version with read-only registry requests. A temporary
+404 is pending propagation, not a second upload: confirmation retries every 15 seconds for up to ten minutes.
+Matching source identity and integrity are still required; conflicting identity and other HTTP refusals fail
+immediately. Exhausted confirmation reports an unverified upload and leaves the admitted ledger intact.
+The window rounds up three times the observed confirmation delay; it is not a registry availability guarantee. Its
+[captured measurement](measurements/registry-confirmation.json) records the source commit, real Actions mode,
+concurrent work, commands and UTC observations; repeat it on a fresh sandbox version when registry behavior changes.
+
 ## Contribution and operation
 
 Contributors can create and index fixed pack files, derive their vendored spec, compile package facts and assess
