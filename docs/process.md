@@ -194,6 +194,9 @@ submission, checking, generation and publishing commands are documented in READM
 the schema/validation code, so contributors see the same refusals before opening a PR.
 
 Automation maintains one PR feedback comment, includes the report in the check summary, and updates it on reruns.
+GitHub reads retry one transport failure; HTTP refusals and writes are not retried. A transport failure identifies
+the method, repository path and underlying error code. A passing evaluation remains retained evidence until GitHub
+successfully records its current-head readiness check; it does not grant admission on its own.
 Manual workflow dispatch can reassess a PR after an external failure. Moderators configure membership through the
 repository's CODEOWNERS users or teams; platform write access is not required. Repository setup and npm publication are explicit
 operator actions. Deploy tokens, website changes, making repositories public, and operating GitHub settings are not
