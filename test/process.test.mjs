@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { admit, classify, compareReports, defaults, digest, read, stable, submissionId, validateIndex, validateSubmission, write } from '../lib/model.mjs';
 import { integrityOf, verifyArtifact, metadata, registryURL } from '../lib/registry.mjs';
-import { build, builtIndex, publish, reviewSatisfied } from '../lib/publication.mjs';
+import { build, builtIndex, publish, reviewSatisfied, internalAdmission, verifyAdmission } from '../lib/publication.mjs';
 import { assessPullRequest, configure } from '../lib/automation.mjs';
 import { GitHub, summary } from '../lib/github.mjs';
 import { propose } from '../lib/propose.mjs';
@@ -211,6 +211,62 @@ test('operator configuration is read-only unless apply is explicit', async () =>
   let calls = 0; const g = { call: async () => { calls++; return { errors: [] }; } };
   assert.equal((await configure(g)).applied, false); assert.equal(calls, 0);
   await configure(g, true); assert.equal(calls, 3);
+  const desired = await configure(g, false, ['maintainer']);
+  assert.deepEqual(desired.protection.required_pull_request_reviews.bypass_pull_request_allowances.users, ['maintainer']);
+  await assert.rejects(configure(g, true, ['outside/team']), /invalid internal maintainer/);
+  assert.equal(calls, 3);
+});
+
+test('internal admission requires an explicit trusted repository, same-repo origin and named maintainer', () => {
+  const pr = { merged_at: at, merged_by: { login: 'maintainer' }, author_association: 'NONE', user: { login: 'github-actions[bot]', type: 'Bot' }, head: { sha, repo: { full_name: 'catalog/index' } }, base: { repo: { full_name: 'catalog/index' } } };
+  const policy = { internalRepositories: [source.repository], reviewBypassUsers: ['maintainer'] };
+  assert.equal(internalAdmission(pr, source, policy, 'admin'), true);
+  assert.equal(internalAdmission(pr, source, policy, 'maintain'), true);
+  assert.equal(internalAdmission(pr, source, policy, 'write'), false);
+  assert.equal(internalAdmission(pr, source, { ...policy, internalRepositories: source.repository }, 'admin'), false);
+  assert.equal(internalAdmission(pr, source, { ...policy, reviewBypassUsers: 'maintainer' }, 'admin'), false);
+  assert.equal(internalAdmission(pr, { ...source, official: true }, {}, 'admin'), false);
+  assert.equal(internalAdmission(pr, { ...source, repository: 'outsider/packs' }, policy, 'admin'), false);
+  assert.equal(internalAdmission({ ...pr, merged_by: { login: 'outsider' } }, source, policy, 'admin'), false);
+  assert.equal(internalAdmission({ ...pr, head: { ...pr.head, repo: { full_name: 'outsider/fork' } } }, source, policy, 'admin'), false);
+  assert.equal(internalAdmission({ ...pr, user: { login: 'outside-bot', type: 'Bot' } }, source, policy, 'admin'), false);
+  assert.equal(internalAdmission({ ...pr, user: { login: 'outsider', type: 'User' } }, source, policy, 'admin'), false);
+  const checks = [{ name: 'catalog/readiness', head_sha: sha, conclusion: 'success', app: { slug: 'github-actions' } }];
+  assert.equal(reviewSatisfied(pr, [], checks, true), true);
+  assert.equal(reviewSatisfied(pr, [], checks), false);
+  assert.equal(reviewSatisfied(pr, [], [], true), false);
+  assert.equal(reviewSatisfied({ ...pr, merged_at: null }, [], checks, true), false);
+  assert.equal(reviewSatisfied(pr, [{ commit_id: sha, state: 'CHANGES_REQUESTED', user: { login: 'moderator' } }], checks, true), false);
+});
+
+test('publication admits internal maintainer merges but external artifacts still need human review', async () => {
+  const { root, git } = fixture(), s = submitted(), path = `submissions/${submissionId(s)}.json`;
+  write(join(root, 'policy.json'), { internalRepositories: [source.repository], reviewBypassUsers: ['maintainer'] });
+  write(join(root, path), s); git('add', '.'); git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Internal admission fixture');
+  const commit = git('rev-parse', 'HEAD');
+  const pr = { number: 1, merged_at: at, merged_by: { login: 'maintainer' }, author_association: 'NONE', user: { login: 'github-actions[bot]', type: 'Bot' }, head: { sha, repo: { full_name: 'catalog/index' } }, base: { ref: 'main', repo: { full_name: 'catalog/index' } } };
+  const check = { name: 'catalog/readiness', head_sha: sha, conclusion: 'success', app: { slug: 'github-actions' }, external_id: `1:${sha}:${commit}:${'b'.repeat(64)}` };
+  let permission = 'admin', reviews = [];
+  const github = { repository: 'catalog/index', content: async (file) => file === '.github/CODEOWNERS' ? '* @maintainer' : JSON.stringify(s), pages: async (route) => route.endsWith('/pulls') ? [pr] : route.endsWith('/files') ? [{ filename: path, status: 'added' }] : reviews, call: async (route) => {
+    if (route === 'git/ref/heads/main') return { object: { sha: commit } };
+    if (route.startsWith('codeowners/errors')) return { errors: [] };
+    if (route === 'branches/main/protection') return { enforce_admins: { enabled: true }, required_status_checks: { strict: true, contexts: ['catalog/readiness'] }, required_pull_request_reviews: { dismiss_stale_reviews: true, require_code_owner_reviews: true, require_last_push_approval: true } };
+    if (route === 'pulls/1') return pr;
+    if (route.startsWith('commits/')) return { check_runs: [check] };
+    if (route.startsWith('collaborators/')) return { permission };
+    throw new Error(`unexpected request: ${route}`);
+  } };
+  const proofs = await verifyAdmission(root, github);
+  assert.equal(proofs[0].moderation.mode, 'internal-maintainer-merge');
+  permission = 'write';
+  await assert.rejects(verifyAdmission(root, github), /no reviewed current-head admission/);
+  permission = 'admin';
+  pr.head.repo.full_name = 'outside/fork';
+  await assert.rejects(verifyAdmission(root, github), /no reviewed current-head admission/);
+  reviews = [{ state: 'APPROVED', commit_id: sha, user: { login: 'moderator', type: 'User' }, author_association: 'MEMBER' }];
+  assert.equal((await verifyAdmission(root, github))[0].moderation.mode, 'human-review');
+  check.conclusion = 'cancelled';
+  await assert.rejects(verifyAdmission(root, github), /no reviewed current-head admission/);
 });
 test('summary preserves missing measurements and escapes contributor markup and mentions', () => {
   const body = summary({ status: 'changes-needed', error: '<script>@moderators</script>', input: { head: sha }, report: { quick: { surface: null, answered: 1, failures: [], replay: { equal: false } }, gates: [], conformance: [] } });

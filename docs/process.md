@@ -15,7 +15,12 @@ not vendor identities. Version ordering applies only within one package, never b
 
 `sources.json` registers sources. Registration is its own moderator-reviewed PR; a submission cannot grant its source
 trust, change evaluation tools, or change catalog policy. `official` identifies Volter maintenance, not a verification
-exemption or vendor endorsement. Every new release follows the same readiness and moderator-approval requirements.
+exemption or vendor endorsement. Every new release follows the same readiness requirements. Outside contributions
+require current-head human moderator approval. Maintainers may merge their own changes without a separate review.
+Internal admissions require the registered repository to be explicitly listed in `policy.internalRepositories`,
+a PR branch in this catalog repository, and a merge by a maintainer named in `policy.reviewBypassUsers` whose current
+GitHub permission is `admin` or `maintain`. The author must be a repository member/collaborator or its GitHub Actions
+bot. A bot author or `official` badge alone does not make an outside publisher internal.
 Public-source npm provenance is required for new admissions. Existing index records without an assessment remain
 historical records, explicitly unassessed; migration does not manufacture evidence or reapprove them. A separate
 `reassessments/<id>.json` PR uses the same immutable submission schema, checks and moderator review to assess an
@@ -66,9 +71,11 @@ cannot select its own evaluator, thresholds, registry, commands or privileges.
 | Admitted | Approved merge on protected main | Publication builds the index |
 | Rejected | Moderator closes the PR with a reason | New submission if corrected |
 
-Readiness is not approval. No bot approves or merges. Review dismissal on new commits, required current-head checks,
+Readiness is not approval. Catalog assessment never approves or merges. Review dismissal on new commits, required current-head checks,
 CODEOWNERS review and a branch rule requiring the branch to be current enforce the decision. A moderator's identity
 comes from GitHub review and merge events, never a contributor's `by` string. Self-approval is not accepted as review.
+Named maintainers have a review bypass for internal changes; outside admissions still need human review, and both
+paths need current-head readiness. Publication records which admission path and merger established authority.
 The repository's installation command checks/configures these rules explicitly; merely committing a workflow is not
 evidence that they are enabled. No credentials or repository settings are changed by an ordinary build.
 

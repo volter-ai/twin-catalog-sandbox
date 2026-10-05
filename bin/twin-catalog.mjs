@@ -40,7 +40,7 @@ try {
       if (result.status !== 'ready') process.exitCode = 1;
       break;
     }
-    case 'configure': result = await configure(github(), args.includes('--apply')); break;
+    case 'configure': result = await configure(github(), args.includes('--apply'), policy().reviewBypassUsers ?? []); break;
     case 'propose': {
       requireThat(args.includes('--send'), 'propose opens GitHub PRs; pass --send for this explicit publisher action');
       result = await propose(github(), resolve(arg('from', args.includes('--reassess') ? 'reassessments' : 'submissions')), args.includes('--reassess'));
