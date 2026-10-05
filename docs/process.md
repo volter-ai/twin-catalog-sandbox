@@ -67,8 +67,8 @@ cannot select its own evaluator, thresholds, registry, commands or privileges.
 | Checking | Current-head readiness check in progress | Automation evaluates |
 | Changes needed | Validation, evaluation or replay failed | Contributor updates and resubmits |
 | Ready for review | Required checks passed for this head and policy | Moderator inspects evidence |
-| Approved | Authorized current-head review; required checks still current | Moderator merges |
-| Admitted | Approved merge on protected main | Publication builds the index |
+| Approved | Outside admission has authorized current-head review; required checks still current | Moderator merges |
+| Admitted | Authorized merge on protected main through external review or the internal maintainer path | Publication builds the index |
 | Rejected | Moderator closes the PR with a reason | New submission if corrected |
 
 Readiness is not approval. Catalog assessment never approves or merges. Review dismissal on new commits, required current-head checks,
@@ -233,8 +233,11 @@ uses synthetic inputs where possible and never real publication:
 4. Changed bytes, package identity, vendor facts, provenance, head, base or evaluator invalidate the corresponding
    assessment. Failed, cancelled or missing checks never become ready or admitted.
 5. Empty/mismatching replay fails; passing checks and partial surface remain separate measurements.
-6. Moderator review is required after readiness; approval of an old head and contributor-supplied reviewer names
-   cannot admit a release. Automation has no merge path.
+6. Outside admissions require current-head human moderator review after readiness; approval of an old head and
+   contributor-supplied reviewer names cannot admit a release. Internal admissions may omit a separate review only
+   for an explicitly trusted source, a same-repository PR and an authorized maintainer merge with verified current
+   permission. Both paths require current-head readiness; a bot author or official badge alone grants no exemption.
+   Automation has no merge path.
 7. Merging adds one immutable release, preserves other publishers and pins, and produces an index without a platform
    checkout, hosted build or website.
 8. Publication retry is idempotent; a conflicting published identity fails, and a revoked release is not recommended.
