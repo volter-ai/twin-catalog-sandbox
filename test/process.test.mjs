@@ -8,7 +8,7 @@ import { admit, classify, compareReports, defaults, digest, read, stable, submis
 import { integrityOf, verifyArtifact, metadata, registryURL } from '../lib/registry.mjs';
 import { build, builtIndex, publish, reviewSatisfied } from '../lib/publication.mjs';
 import { assessPullRequest, configure } from '../lib/automation.mjs';
-import { summary } from '../lib/github.mjs';
+import { GitHub, summary } from '../lib/github.mjs';
 import { propose } from '../lib/propose.mjs';
 import { evaluate } from '../lib/runner.mjs';
 
@@ -18,6 +18,33 @@ const bytes = Buffer.from('synthetic immutable artifact');
 const submitted = (changes = {}) => ({ schemaVersion: 1, source: 'outside', vendor: 'stripe', package: '@outside/payments', version: '1.2.3', integrity: integrityOf(bytes), ...changes });
 const index = () => ({ sources: [source, official], vendors: [], recommendations: {}, revocations: [] });
 const sha = 'a'.repeat(40), at = '2026-10-04T00:00:00Z';
+
+test('GitHub reads recover one transport failure without retrying refusals or writes', async () => {
+  const failure = new TypeError('fetch failed', { cause: { code: 'UND_ERR_SOCKET' } });
+  let calls = 0;
+  const github = new GitHub('outside/catalog', 'synthetic-token', async () => {
+    if (++calls === 1) throw failure;
+    return { ok: true, status: 200, json: async () => ({ head: sha }) };
+  });
+  assert.deepEqual(await github.call('pulls/1'), { head: sha });
+  assert.equal(calls, 2);
+  for (const method of ['POST', 'PATCH', 'PUT', 'DELETE']) {
+    calls = 0;
+    github.fetcher = async () => { calls++; throw failure; };
+    await assert.rejects(github.call('pulls/1', method), /GitHub .* transport failed \(UND_ERR_SOCKET\)/);
+    assert.equal(calls, 1);
+  }
+  calls = 0;
+  github.fetcher = async () => { calls++; throw failure; };
+  await assert.rejects(github.call('pulls/1'), /transport failed \(UND_ERR_SOCKET\)/);
+  assert.equal(calls, 2);
+  for (const status of [403, 404, 429, 500]) {
+    calls = 0;
+    github.fetcher = async () => { calls++; return { ok: false, status }; };
+    await assert.rejects(github.call('pulls/1'), new RegExp(`HTTP ${status}`));
+    assert.equal(calls, 1);
+  }
+});
 
 test('preparation refusal retains a failed envelope, diagnostics and owned cleanup', () => {
   const root = mkdtempSync(join(tmpdir(), 'catalog-preparation-refusal-'));
