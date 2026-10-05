@@ -349,3 +349,15 @@ test('normalized check URLs resolve only their matching trusted workflow suite a
     await assert.rejects(readinessRun({ ...proof, check: { ...proof.check, details_url } }, github));
   }
 });
+
+test('Actions archive and release asset downloads use their required media types and retain binary bytes', async () => {
+  const bytes = Uint8Array.from([0x50, 0x4b, 0, 255]);
+  const calls = [];
+  const github = new GitHub('catalog/index', 'synthetic-token', async (url, options) => {
+    calls.push({ url, accept: options.headers.accept });
+    return { ok: true, arrayBuffer: async () => bytes.buffer };
+  });
+  assert.deepEqual(await github.download('actions/artifacts/7/zip'), Buffer.from(bytes));
+  assert.deepEqual(await github.download('releases/assets/8'), Buffer.from(bytes));
+  assert.deepEqual(calls.map((c) => c.accept), ['application/vnd.github+json', 'application/octet-stream']);
+});
