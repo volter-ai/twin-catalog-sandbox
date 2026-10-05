@@ -1,39 +1,16 @@
-name: Publish catalog index
+name: Check default-token settings access
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
-  contents: write
-  actions: read
+  contents: read
   checks: read
   pull-requests: read
-  id-token: write
-concurrency:
-  group: catalog-publication
-  cancel-in-progress: false
 jobs:
-  publish:
-    if: vars.CATALOG_PUBLISH_ENABLED == 'true'
+  inspect:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-      # No candidate imports, installs or tests run in this credentialed job.
-      - name: Verify admission and publish immutable index
+      - name: Read branch protection with the default token
         env:
           GH_TOKEN: ${{ github.token }}
-          CATALOG_READ_TOKEN: ${{ secrets.CATALOG_READ_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: node bin/twin-catalog.mjs publish --out dist > publication.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: catalog-publication-${{ github.run_id }}
-          path: publication.json
+        run: |
+          gh api graphql -f query='query { repository(owner: "volter-ai", name: "twin-catalog-sandbox") { defaultBranchRef { name branchProtectionRule { isAdminEnforced requiresApprovingReviews requiresCodeOwnerReviews requiresLastPushApproval requiredApprovingReviewCount requiresStatusChecks requiresStrictStatusChecks requiredStatusCheckContexts } } } }'
