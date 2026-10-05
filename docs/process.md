@@ -186,6 +186,14 @@ Each admitted version links to its submission and merge commit; the GitHub PR re
 Index generation does not import a pack, execute tests or rebuild the platform. The website and hosted runtime are
 independent consumers of the published index; their absence or build failures do not block index publication.
 
+The publisher verifies branch protection and merger permissions with read-only GitHub App access, separate from
+its index/evidence write token. Install the App only on the catalog repositories with administration, contents,
+checks and pull requests set to read. Store its client ID in `CATALOG_READ_APP_CLIENT_ID` and private key in
+`CATALOG_READ_APP_PRIVATE_KEY`. The pinned token action requests those permissions only for the current catalog
+repository and revokes its installation token after the job. The key is available only to the trusted publication
+job; candidate preparation and evaluation remain credential-free. A preconfigured equivalent `CATALOG_READ_TOKEN`
+is supported for existing operators. Missing read access fails admission verification and cannot bypass it.
+
 Publication is serialized and starts from a clean checkout of current protected main. An obsolete queued job refuses
 to publish, so it cannot move the registry default backwards; retry on current main includes its admitted releases.
 A release identifies its source commit and npm artifact; retrying the same commit reuses
