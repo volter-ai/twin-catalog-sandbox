@@ -324,3 +324,40 @@ test('invalid moderator configuration refuses protection changes before making a
   await assert.rejects(configure({ call: async (path, method = 'GET') => { calls.push({ path, method }); return { errors: [{ kind: 'Unknown owner' }] }; } }, true), /CODEOWNERS is invalid/);
   assert.ok(calls.every((c) => c.method === 'GET'));
 });
+
+test('normalized check URLs resolve only their matching trusted workflow suite and head', async () => {
+  const { readinessRun } = await import('../lib/evidence.mjs');
+  const proof = { head: sha, check: { id: 42, check_suite: { id: 7 }, details_url: 'https://github.com/catalog/index/runs/42' } };
+  const run = { id: 9, check_suite_id: 7, head_sha: sha, path: '.github/workflows/check.yml', event: 'pull_request_target' };
+  let runs = [run];
+  const github = { repository: 'catalog/index', call: async (path) => {
+    if (path === 'actions/runs/9') return run;
+    assert.equal(path, 'actions/runs?check_suite_id=7&per_page=100');
+    return { workflow_runs: runs };
+  } };
+  assert.equal((await readinessRun(proof, github)).id, 9);
+  assert.equal((await readinessRun({ ...proof, check: { ...proof.check, details_url: 'https://github.com/catalog/index/actions/runs/9' } }, github)).id, 9);
+  for (const change of [{ check_suite_id: 8 }, { head_sha: 'c'.repeat(40) }, { path: '.github/workflows/other.yml' }]) {
+    runs = [{ ...run, ...change }];
+    await assert.rejects(readinessRun(proof, github), /no unique matching/);
+  }
+  runs = [run, run];
+  await assert.rejects(readinessRun(proof, github), /no unique matching/);
+  runs = [{ ...run, event: 'push' }];
+  await assert.rejects(readinessRun(proof, github), /trusted readiness workflow/);
+  for (const details_url of ['https://github.com/outside/fork/runs/42', 'https://github.com/catalog/index/runs/43', 'https://outside.invalid/catalog/index/runs/42']) {
+    await assert.rejects(readinessRun({ ...proof, check: { ...proof.check, details_url } }, github));
+  }
+});
+
+test('Actions archive and release asset downloads use their required media types and retain binary bytes', async () => {
+  const bytes = Uint8Array.from([0x50, 0x4b, 0, 255]);
+  const calls = [];
+  const github = new GitHub('catalog/index', 'synthetic-token', async (url, options) => {
+    calls.push({ url, accept: options.headers.accept });
+    return { ok: true, arrayBuffer: async () => bytes.buffer };
+  });
+  assert.deepEqual(await github.download('actions/artifacts/7/zip'), Buffer.from(bytes));
+  assert.deepEqual(await github.download('releases/assets/8'), Buffer.from(bytes));
+  assert.deepEqual(calls.map((c) => c.accept), ['application/vnd.github+json', 'application/octet-stream']);
+});
