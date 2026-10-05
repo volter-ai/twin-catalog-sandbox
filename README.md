@@ -79,9 +79,12 @@ not changes performed by implementing this process.
 `policy.internalRepositories` lists the registered pack repositories eligible for that admission path. Outside
 publishers still need human review; all admissions need verified provenance and current-head readiness.
 
-If the default Actions token cannot read branch protection, `CATALOG_READ_TOKEN` must belong to a GitHub App with
-repository administration read, contents read, checks read and pull requests read. No administration write permission
-is needed by publication. Publisher CI can run `twin-catalog propose --from <submission-directory> --send` with its
+The publication workflow uses a GitHub App with repository administration read, contents read, checks read and
+pull requests read. Install it only on the catalog repositories, set repository variable `CATALOG_READ_APP_CLIENT_ID`
+and secret `CATALOG_READ_APP_PRIVATE_KEY`, and keep its private key out of source and diagnostic output. Each job
+mints a short-lived token limited to its own repository; the action revokes it after the job. Existing deployments
+may supply an equivalent scoped `CATALOG_READ_TOKEN`. No administration write permission is needed by publication.
+Missing policy access refuses publication. Publisher CI can run `twin-catalog propose --from <submission-directory> --send` with its
 separate catalog PR token; that command opens idempotent submission PRs and never approves or merges them.
 
 Workflow dispatch with a PR number reruns readiness after an infrastructure failure. Publication dispatch retries
