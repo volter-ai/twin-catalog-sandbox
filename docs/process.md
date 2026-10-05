@@ -20,7 +20,9 @@ require current-head human moderator approval. Maintainers may merge their own c
 Internal admissions require the registered repository to be explicitly listed in `policy.internalRepositories`,
 a PR branch in this catalog repository, and a merge by a maintainer named in `policy.reviewBypassUsers` whose current
 GitHub permission is `admin` or `maintain`. The author must be a repository member/collaborator or its GitHub Actions
-bot. A bot author or `official` badge alone does not make an outside publisher internal.
+bot, or a publisher bot explicitly named in `policy.internalBotAuthors`. Each configured publisher bot binds both
+its GitHub user ID and exact login; its App registration ID is a different identity. An unconfigured or mismatched
+bot remains outside the internal path. A bot author or `official` badge alone does not make an outside publisher internal.
 Public-source npm provenance is required for new admissions. Existing index records without an assessment remain
 historical records, explicitly unassessed; migration does not manufacture evidence or reapprove them. A separate
 `reassessments/<id>.json` PR uses the same immutable submission schema, checks and moderator review to assess an
@@ -194,6 +196,14 @@ repository and revokes its installation token after the job. The key is availabl
 job; candidate preparation and evaluation remain credential-free. A preconfigured equivalent `CATALOG_READ_TOKEN`
 is supported for existing operators. Missing read access fails admission verification and cannot bypass it.
 
+Trusted pack repositories use a separate publisher App to propose immutable data PRs. Install that App only on the
+target catalogs with contents and pull requests set to write, without administration. Store its client ID as
+`CATALOG_PR_APP_CLIENT_ID` and key as `CATALOG_PR_APP_PRIVATE_KEY` in the trusted publisher repository, never in
+candidate evaluation. Its workflow mints a short-lived token restricted to the target catalog and revokes it after
+proposal. App-authored PR events start catalog readiness through GitHub's normal event flow; the publisher does not
+dispatch or choose an evaluator. Existing scoped `CATALOG_PR_TOKEN` deployments remain supported. Outside publishers
+do not receive Volter's App key: they register their own source and submit through their own GitHub account or fork.
+
 Publication is serialized and starts from a clean checkout of current protected main. An obsolete queued job refuses
 to publish, so it cannot move the registry default backwards; retry on current main includes its admitted releases.
 A release identifies its source commit and npm artifact; retrying the same commit reuses
@@ -252,3 +262,6 @@ uses synthetic inputs where possible and never real publication:
 
 Results state exactly what ran. Static workflow inspection and local fixture checks are not a real GitHub/npm
 activation, and a local quick assessment is not a browser fidelity result.
+
+After npm accepts an upload, publisher submission preparation may use `submit --confirm-published`. It waits only
+for exact-version HTTP 404 propagation, with the same measured bound as index confirmation, and performs no upload.

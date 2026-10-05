@@ -275,6 +275,33 @@ test('internal admission requires an explicit trusted repository, same-repo orig
   assert.equal(reviewSatisfied(pr, [{ commit_id: sha, state: 'CHANGES_REQUESTED', user: { login: 'moderator' } }], checks, true), false);
 });
 
+test('publisher bot admission binds both GitHub user ID and login without relaxing source or merge rules', () => {
+  const author = { id: 338186041, login: 'volter-twin-catalog-publisher[bot]' };
+  const policy = { internalRepositories: [source.repository], reviewBypassUsers: ['maintainer'], internalBotAuthors: [author] };
+  const pr = { user: { ...author, type: 'Bot' }, author_association: 'NONE', merged_by: { login: 'maintainer' }, head: { repo: { full_name: 'catalog/index' } }, base: { repo: { full_name: 'catalog/index' } } };
+  assert.equal(internalAdmission(pr, source, policy, 'admin'), true);
+  for (const user of [{ ...pr.user, id: 1 }, { ...pr.user, login: 'lookalike[bot]' }, { ...pr.user, type: 'User' }]) assert.equal(internalAdmission({ ...pr, user }, source, policy, 'admin'), false);
+  for (const internalBotAuthors of [undefined, 'publisher', [null], [{ ...author, id: '338186041' }], [{ ...author, id: 0 }]]) assert.equal(internalAdmission(pr, source, { ...policy, internalBotAuthors }, 'admin'), false);
+  assert.equal(internalAdmission(pr, { ...source, repository: 'outside/packs' }, policy, 'admin'), false);
+  assert.equal(internalAdmission({ ...pr, head: { repo: { full_name: 'outside/fork' } } }, source, policy, 'admin'), false);
+  assert.equal(internalAdmission(pr, source, policy, 'write'), false);
+  assert.equal(internalAdmission({ ...pr, merged_by: { login: 'outside' } }, source, policy, 'admin'), false);
+});
+
+test('publisher confirmation retries only absent exact metadata, with a finite deadline', async () => {
+  const s = submitted(), clock = confirmationClock(); let calls = 0;
+  const doc = { name: s.package, version: s.version };
+  assert.deepEqual(await metadata(s.package, s.version, 'https://registry.npmjs.org', async () => ++calls < 3 ? { ok: false, status: 404 } : { ok: true, json: async () => doc }, clock.options), doc);
+  assert.equal(calls, 3);
+  for (const status of [401, 403, 429, 500]) {
+    let reads = 0; const timing = confirmationClock();
+    await assert.rejects(metadata(s.package, s.version, 'https://registry.npmjs.org', async () => { reads++; return { ok: false, status }; }, timing.options), new RegExp('HTTP ' + status));
+    assert.equal(reads, 1);
+  }
+  await assert.rejects(metadata(s.package, s.version, 'https://registry.npmjs.org', async () => ({ ok: false, status: 404 }), confirmationClock().options), /retry confirmation/);
+  await assert.rejects(metadata(s.package, s.version, 'https://registry.npmjs.org', async () => ({ ok: true, json: async () => ({ ...doc, version: '9.0.0' }) }), confirmationClock().options), /different package/);
+});
+
 test('publication admits internal maintainer merges but external artifacts still need human review', async () => {
   const { root, git } = fixture(), s = submitted(), path = `submissions/${submissionId(s)}.json`;
   write(join(root, 'policy.json'), { internalRepositories: [source.repository], reviewBypassUsers: ['maintainer'] });
