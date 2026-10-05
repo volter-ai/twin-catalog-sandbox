@@ -11,5 +11,6 @@
   "nodeImage": "node:24-bookworm-slim",
   "requireProvenance": true,
   "reviewBypassUsers": ["yueranyuan"],
+  "internalBotAuthors": [{"id":338186041,"login":"volter-twin-catalog-publisher[bot]"}],
   "internalRepositories": ["volter-ai/twin-packs-sandbox"]
 }

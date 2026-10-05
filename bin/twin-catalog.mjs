@@ -22,7 +22,7 @@ try {
     case 'submit': {
       const indexRoot = existsSync(join(root, 'sources.json')) ? root : installed;
       const p = policy();
-      const doc = await metadata(arg('package'), arg('version'), p.registry);
+      const doc = await metadata(arg('package'), arg('version'), p.registry, fetch, args.includes('--confirm-published') ? {} : undefined);
       const submission = { schemaVersion: 1, source: arg('source'), vendor: arg('vendor'), package: doc.name, version: doc.version, integrity: doc.dist?.integrity };
       validateSubmission(submission, loadIndex(indexRoot).sources);
       const file = resolve(arg('out', join(resolve(arg('out-dir', join(root, args.includes('--reassess') ? 'reassessments' : 'submissions'))), `${submissionId(submission)}.json`)));

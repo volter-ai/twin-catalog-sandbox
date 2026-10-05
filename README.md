@@ -80,6 +80,8 @@ not changes performed by implementing this process.
 `policy.reviewBypassUsers` names maintainers allowed to merge internal changes without a separate review.
 `policy.internalRepositories` lists the registered pack repositories eligible for that admission path. Outside
 publishers still need human review; all admissions need verified provenance and current-head readiness.
+`policy.internalBotAuthors` binds each trusted publisher bot by GitHub user ID and exact login. It grants no
+exception without the internal source, same-catalog PR and authorized maintainer merge.
 
 The publication workflow uses a GitHub App with repository administration read, contents read, checks read and
 pull requests read. Install it only on the catalog repositories, set repository variable `CATALOG_READ_APP_CLIENT_ID`
@@ -98,10 +100,18 @@ release from future selection; existing World pins are preserved.
 Set `CATALOG_PUBLISH_ENABLED=true` only after readiness verification and moderator setup.
 
 Volter's pack release workflow stays inactive while its source repository is private, as required by npm provenance.
-Before making that source public, configure its separate `CATALOG_PR_TOKEN` with catalog contents and pull-request
-write, without administration. Source visibility exposes Git history and remains an explicit owner decision.
+Its trusted release workflow uses `CATALOG_PR_APP_CLIENT_ID` and `CATALOG_PR_APP_PRIVATE_KEY` in the pack repository
+to mint a short-lived catalog contents/pull-request write token, without administration. Install that separate App
+only on the target catalogs. Existing scoped `CATALOG_PR_TOKEN` configuration remains supported. Outside publishers
+use their own GitHub accounts/forks, never Volter's App key. Source visibility exposes Git history and remains an
+explicit owner decision.
 
 [Build in your own repository](docs/contributing.md) uses the released tools.
 
 Browser pages are separate work. JSON reports distinguish quick replay from full admission conformance; unmeasured
 DOM, line and state coverage remain explicit. Readiness artifacts are evidence, not a fidelity guarantee.
+
+A publisher that has just completed npm upload can use `submit --confirm-published` to wait for its exact
+version metadata before opening a PR. Only HTTP 404 is retried, every 15 seconds for at most ten minutes, based
+on [the registry measurement](docs/measurements/registry-confirmation.json). Other errors and identity mismatches
+fail immediately. This option performs registry reads only; it never uploads or evaluates a package.
