@@ -1,0 +1,48 @@
+name: Catalog readiness
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request to reassess
+        required: true
+        type: number
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+concurrency:
+  group: catalog-readiness-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: true
+jobs:
+  assess:
+    runs-on: ubuntu-latest
+    steps:
+      # Never check out the candidate. Read only its data through the API at the exact head.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || 'main' }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Prepare current-head evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CATALOG_PR: ${{ github.event.pull_request.number || inputs.pr }}
+        run: node bin/twin-catalog.mjs assess-pr --out assessment/report.json
+      - name: Retain evidence and failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalog-assessment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: assessment/
+          if-no-files-found: warn
+
+      - name: Clean up containers owned by this workflow run
+        if: always()
+        env:
+          CATALOG_RUN: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: node runner/cleanup.mjs

@@ -1,0 +1,29 @@
+name: Propose sandbox admission
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact immutable sandbox package version
+        required: true
+        default: '0.0.1'
+        type: string
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Read published identity and propose data for human review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUBMISSION_VERSION: ${{ inputs.version }}
+        run: |
+          node bin/twin-catalog.mjs submit --source sandbox-publisher --vendor tavily --package @volter/twin-sandbox-tavily --version "$SUBMISSION_VERSION" --out-dir /tmp/sandbox-submissions
+          node bin/twin-catalog.mjs propose --from /tmp/sandbox-submissions --send

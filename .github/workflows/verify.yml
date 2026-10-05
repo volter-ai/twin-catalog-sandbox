@@ -1,0 +1,69 @@
+name: Verify catalog process and evaluator
+on:
+  workflow_dispatch:
+    inputs:
+      vendor:
+        description: Registered vendor identity to assess
+        required: true
+        type: string
+      package:
+        description: Immutable published package name
+        required: true
+        type: string
+      version:
+        description: Exact published version
+        required: true
+        type: string
+      source:
+        description: Registered source identity
+        required: true
+        default: sandbox-publisher
+        type: string
+      expected_readiness:
+        description: Verify readiness or the specific missing-provenance refusal (never grants admission)
+        required: true
+        default: ready
+        type: choice
+        options:
+          - ready
+          - reject-missing-provenance
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - name: Verify published process tooling through a World
+        run: node runner/verify-process.mjs
+      - name: Verify real npm provenance and substituted identity refusals
+        run: node runner/verify-provenance.mjs
+      - name: Verify released Chromium transport in the offline container
+        run: node runner/verify-browser.mjs
+      - name: Verify the exact artifact through the admission evaluator
+        env:
+          CATALOG_VENDOR: ${{ inputs.vendor }}
+          CATALOG_PACKAGE: ${{ inputs.package }}
+          CATALOG_VERSION: ${{ inputs.version }}
+          CATALOG_SOURCE: ${{ inputs.source }}
+          CATALOG_EXPECTED_READINESS: ${{ inputs.expected_readiness }}
+        run: node runner/verify-evaluator.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: catalog-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: assessment/
+          if-no-files-found: warn
+      - name: Clean up resources owned by this workflow attempt
+        if: always()
+        env:
+          CATALOG_RUN: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: node runner/cleanup.mjs

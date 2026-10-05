@@ -1,0 +1,10 @@
+[
+  {
+    "name": "sandbox-publisher",
+    "repository": "volter-ai/twin-packs-sandbox",
+    "scope": "@volter",
+    "official": false,
+    "protocol": "3",
+    "workflow": "release.yml"
+  }
+]

@@ -1,0 +1,23 @@
+// A public tooling artifact exercises cryptographic provenance; it is not registered or admitted as a twin.
+import assert from 'node:assert/strict';
+import { verify } from 'sigstore';
+import { metadata, registryURL, verifyArtifact, verifiedProvenance } from '../lib/registry.mjs';
+import { write } from '../lib/model.mjs';
+assert.ok(process.env.VOLTER_WORLD, 'provenance fixture must run through a World');
+const registry = 'https://registry.npmjs.org';
+const name = '@sigstore/bundle', version = '4.0.0';
+const integrity = `sha512-${Buffer.from('3700a5e58d15e838b435ec6f913a9da157e68d3690c282ccdb7eabf3d284a231a6abf8cc96cf12fb36fbc8ec003dd5ef6f07ca0e53fe9665e000be2f292413f8', 'hex').toString('base64')}`;
+const doc = await metadata(name, version, registry);
+const downloaded = await fetch(registryURL(doc.dist.tarball, registry), { redirect: 'error' });
+assert.ok(downloaded.ok);
+const bytes = Buffer.from(await downloaded.arrayBuffer());
+verifyArtifact(bytes, { integrity }, doc);
+const fetched = await fetch(registryURL(doc.dist.attestations.url, registry), { redirect: 'error' });
+assert.ok(fetched.ok);
+const document = await fetched.json();
+const source = { repository: 'sigstore/sigstore-js', workflow: 'release.yml' };
+const receipt = await verifiedProvenance(document, source, bytes, verify);
+assert.equal(receipt.predicateType, 'https://slsa.dev/provenance/v1');
+await assert.rejects(() => verifiedProvenance(document, { ...source, repository: 'another/publisher' }, bytes, verify));
+await assert.rejects(() => verifiedProvenance(document, source, Buffer.from('substituted artifact'), verify));
+write('/work/provenance-report.json', { purpose: 'provenance-mechanism-fixture', passed: true, package: name, version, integrity, receipt, wrongSourceRefused: true, substitutedBytesRefused: true });

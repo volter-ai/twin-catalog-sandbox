@@ -1,0 +1,33 @@
+{
+  "name": "@volter/twin-catalog-sandbox",
+  "version": "0.1.0",
+  "description": "Disposable public catalog integration test; not the production twin catalog.",
+  "type": "module",
+  "bin": {
+    "twin-catalog": "bin/twin-catalog.mjs"
+  },
+  "engines": {
+    "node": ">=22.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/volter-ai/twin-catalog-sandbox.git"
+  },
+  "author": "Volter (https://github.com/volter-ai)",
+  "license": "Apache-2.0",
+  "files": [
+    "sources.json",
+    "vendors",
+    "README.md",
+    "LICENSE",
+    "catalog.json",
+    "recommendations.json",
+    "revocations.json",
+    "policy.json",
+    "bin",
+    "lib",
+    "runner",
+    "docs",
+    "evidence"
+  ]
+}
