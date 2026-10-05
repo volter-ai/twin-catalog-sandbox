@@ -75,6 +75,10 @@ Ordinary commands never modify these settings. Source and catalog repositories m
 publication needs npm trusted publishing or the workflow's scoped `NPM_TOKEN`. These are activation prerequisites,
 not changes performed by implementing this process.
 
+`policy.reviewBypassUsers` names maintainers allowed to merge internal changes without a separate review.
+`policy.internalRepositories` lists the registered pack repositories eligible for that admission path. Outside
+publishers still need human review; all admissions need verified provenance and current-head readiness.
+
 If the default Actions token cannot read branch protection, `CATALOG_READ_TOKEN` must belong to a GitHub App with
 repository administration read, contents read, checks read and pull requests read. No administration write permission
 is needed by publication. Publisher CI can run `twin-catalog propose --from <submission-directory> --send` with its
