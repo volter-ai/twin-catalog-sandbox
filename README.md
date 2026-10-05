@@ -33,8 +33,10 @@ an offline container and a World, and updates one feedback comment. Download the
 the workflow artifacts; admitted reports also have a durable evidence release and an index-package copy. Code fixes require a new published version and updated submission filename. Do not edit the
 index, policy or source registration as part of a release submission.
 
-Passing automation means ready for review. A moderator reviews the exact head and merges it; the catalog does not
-approve or merge itself. A rejection is a closed PR with a reason. Moderators are named in `.github/CODEOWNERS`.
+Passing automation means ready for a maintainer decision. Outside submissions require moderator review of the exact
+head before merge; the internal admission path below permits an authorized maintainer merge without a separate
+review. The catalog does not approve or merge itself. A rejection is a closed PR with a reason. Moderators are named
+in `.github/CODEOWNERS`.
 
 ## Consume the index
 
