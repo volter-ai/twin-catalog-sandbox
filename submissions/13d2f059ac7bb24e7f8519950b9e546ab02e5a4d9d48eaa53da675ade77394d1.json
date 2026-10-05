@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "source": "sandbox-publisher",
+  "vendor": "tavily",
+  "package": "@volter/twin-sandbox-tavily",
+  "version": "0.0.1",
+  "integrity": "sha512-FGw+TvJjNKCukIaxeSBzX+WcdcvqGdqA9/0S8aujyKLejxi5IdHB3dRvPcHmY7/bpEqUVrB4yOj8hEEI6X4vIQ=="
+}
