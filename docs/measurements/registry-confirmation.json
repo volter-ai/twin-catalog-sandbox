@@ -1,0 +1,13 @@
+{
+  "mode": "GitHub Actions npm publication and public registry GET",
+  "sourceCommit": "59469beb7c34fbadf6102fccc4a4f576907b309f",
+  "workflowRun": 37326269193,
+  "command": "node bin/twin-catalog.mjs publish --out dist; urllib.request.urlopen(exactVersionURL)",
+  "concurrentWork": "admission policy and durable-evidence verification in the same publisher job; no candidate tests or builds",
+  "postPublish404At": "2026-10-05T14:38:56.872636+00:00",
+  "confirmedAt": "2026-10-05T14:42:03.692478+00:00",
+  "observedConfirmationDelayUpperBoundSeconds": 186.819842,
+  "version": "0.2.7",
+  "integrity": "sha512-QbilRGDn7YtSeGPOMOdlWlmHTSpQqtpq7nU1h20Z6QDm+cx1zmIJSlQ3h/TVtO6G33I1SLOtyzU5N/v6Hcw39w==",
+  "remeasure": "On a fresh public sandbox main commit, run node bin/twin-catalog.mjs publish --out dist in publish.yml, then repeat urllib.request.urlopen('https://registry.npmjs.org/@volter%2ftwin-catalog-sandbox/<exact-new-version>') with datetime.datetime.now(datetime.timezone.utc) until HTTP 200. Retain the workflow source SHA, first post-upload 404 time and first observed 200 time."
+}
